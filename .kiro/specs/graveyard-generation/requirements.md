@@ -27,3 +27,7 @@ Turns a `RepoSnapshot` into a `Graveyard` and a deterministic 2D layout.
 15. THE layout SHALL keep every zombie wander loop inside the band from 1.5 to 7.5 units beyond the outermost plot, inside the fence.
 16. THE loader SHALL reject a snapshot whose `exports` or `deps` entries are malformed before classification, and SHALL report the real cause of any later failure.
 17. THE fetch ingest SHALL take `now` as a required argument and SHALL NOT read the clock.
+18. WHERE the user supplies a GitHub token, THE ingest SHALL send it as `Authorization: Bearer <token>` to api.github.com only and SHALL NOT send it to the npm registry. WHEN no token is supplied, THE ingest SHALL behave exactly as before, with no Authorization header.
+19. IF GitHub answers 401, THEN THE ingest SHALL report that the token was rejected.
+20. IF a rate limit is reported, THEN THE ingest result SHALL carry `resetAt`, and THE UI SHALL show the local reset time and suggest adding a token.
+21. THE token SHALL be kept in sessionStorage only and never logged. THE loader SHALL cache a fetched snapshot in localStorage per repo for one hour, use it without any GitHub call, and offer a way to refresh.

@@ -140,3 +140,65 @@ test("digit-less ranges without registry data stay quiet", () => {
   assert.equal(snap.deps[0]!.current, snap.deps[0]!.latest);
   assert.equal(classify(snap, NOW).zombies.length, 0);
 });
+
+type Call = { url: string; init?: { headers?: Record<string, string> } };
+function recorder(status = 200) {
+  const calls: Call[] = [];
+  const fetcher = async (url: string, init?: { headers?: Record<string, string> }) => {
+    calls.push({ url, init });
+    let body: unknown = {};
+    if (url.includes("/git/trees/")) body = { tree: [{ path: "a.ts", type: "blob", size: 64 }] };
+    else if (url.includes("/commits")) body = [commit("abc", "2026-10-20T00:00:00Z")];
+    else if (url.includes("/contents/package.json")) body = { encoding: "base64", content: "eyJkZXBlbmRlbmNpZXMiOnsibGVmdC1wYWQiOiIxLjAuMCJ9fQ==" };
+    else if (url.includes("registry.npmjs.org")) body = { version: "1.3.0" };
+    return { ok: status === 200, status, headers: { get: () => null }, json: async () => body };
+  };
+  return { calls, fetcher };
+}
+
+test("no token sends no init and no Authorization header", async () => {
+  const { calls, fetcher } = recorder();
+  const res = await fetchGithubSnapshot("o/r", fetcher, NOW);
+  assert.equal(res.ok, true);
+  assert.ok(calls.length > 3);
+  for (const c of calls) assert.equal(c.init, undefined);
+});
+
+test("a token goes to api.github.com only, never the registry", async () => {
+  const { calls, fetcher } = recorder();
+  const res = await fetchGithubSnapshot("o/r", fetcher, NOW, 40, "tok123");
+  assert.equal(res.ok, true);
+  const gh = calls.filter((c) => c.url.startsWith("https://api.github.com/"));
+  const npm = calls.filter((c) => c.url.startsWith("https://registry.npmjs.org/"));
+  assert.ok(gh.length >= 3);
+  assert.ok(npm.length >= 1);
+  for (const c of gh) assert.equal(c.init?.headers?.Authorization, "Bearer tok123");
+  for (const c of npm) assert.equal(c.init, undefined);
+});
+
+test("a blank token is treated as no token", async () => {
+  const { calls, fetcher } = recorder();
+  await fetchGithubSnapshot("o/r", fetcher, NOW, 40, "  ");
+  for (const c of calls) assert.equal(c.init, undefined);
+});
+
+test("401 gives a clear bad token message", async () => {
+  const { fetcher } = recorder(401);
+  const res = await fetchGithubSnapshot("o/r", fetcher, NOW, 40, "bad");
+  assert.equal(res.ok, false);
+  if (!res.ok) {
+    assert.equal(res.rateLimited, false);
+    assert.ok(res.error.includes("rejected the token"));
+  }
+});
+
+test("resetAt is propagated on rate limit", async () => {
+  const res = await fetchGithubSnapshot("o/r", async () => ({
+    ok: false,
+    status: 403,
+    headers: { get: (n: string) => (n === "x-ratelimit-remaining" ? "0" : "1900000000") },
+    json: async () => ({}),
+  }), NOW);
+  assert.equal(res.ok, false);
+  if (!res.ok) assert.equal(res.resetAt?.getTime(), 1900000000 * 1000);
+});

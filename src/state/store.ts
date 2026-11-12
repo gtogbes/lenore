@@ -3,6 +3,7 @@ import { classify } from "../core/analysis.ts";
 import { buildDemoScript } from "../core/demoScript.ts";
 import type { DemoEvent } from "../core/demoScript.ts";
 import { fetchGithubSnapshot } from "../core/githubIngest.ts";
+import { clearToken, readCache, readToken, writeCache, writeToken } from "./githubStorage.ts";
 import { layoutGraveyard } from "../core/layout.ts";
 import { createNecromancer, planRitual } from "../core/necromancer.ts";
 import { SAMPLE_NOW, SAMPLE_SNAPSHOT } from "../core/sampleRepo.ts";
@@ -49,7 +50,10 @@ export interface NecroState {
 
   loadSample: () => void;
   loadSnapshot: (snapshot: RepoSnapshot, now: Date) => void;
-  loadFromGithub: (input: string) => Promise<void>;
+  hasToken: boolean;
+  setToken: (token: string) => void;
+  forgetToken: () => void;
+  loadFromGithub: (input: string, refresh?: boolean) => Promise<void>;
   loadFromJson: (text: string) => void;
   togglePanel: (open?: boolean) => void;
 
@@ -132,6 +136,15 @@ export function isSnapshot(v: unknown): v is RepoSnapshot {
   );
 }
 
+/** Friendly rate limit text with the local reset time. */
+export function rateLimitMessage(resetAt: Date | null, hasToken: boolean): string {
+  const when = resetAt
+    ? ` Try again at ${resetAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`
+    : " Try again later.";
+  const tip = hasToken ? "" : " Adding a GitHub token raises the limit to 5,000 requests per hour.";
+  return `GitHub rate limit reached.${when}${tip} Or use the built-in sample graveyard.`;
+}
+
 function build(snapshot: RepoSnapshot, now: Date) {
   const graveyard = classify(snapshot, now);
   return { repoName: graveyard.repoName, graveyard, layout: layoutGraveyard(graveyard) };
@@ -179,20 +192,43 @@ export const useStore = create<NecroState>()((set, get) => ({
 
   loadSnapshot: (snapshot, now) => set({ ...build(snapshot, now), ...FRESH_SESSION, loading: false, panelOpen: false }),
 
-  loadFromGithub: async (input) => {
+  hasToken: readToken() !== null,
+  setToken: (token) => {
+    writeToken(token);
+    set({ hasToken: readToken() !== null });
+  },
+  forgetToken: () => {
+    clearToken();
+    set({ hasToken: false });
+  },
+
+  loadFromGithub: async (input, refresh = false) => {
     const ownerRepo = parseRepoInput(input);
     if (!ownerRepo) {
       set({ loadError: "Use owner/name or a github.com URL." });
       return;
     }
+    if (!refresh) {
+      const cached = readCache(ownerRepo, Date.now());
+      if (cached && isSnapshot(cached)) {
+        get().loadSnapshot(cached, new Date());
+        return;
+      }
+    }
     set({ loading: true, loadError: null });
     const result = await fetchGithubSnapshot(
       ownerRepo,
-      (url) => fetch(url, { headers: { Accept: "application/vnd.github+json" } }),
+      (url, init) => fetch(url, { headers: { Accept: "application/vnd.github+json", ...init?.headers } }),
       new Date(),
+      40,
+      readToken() ?? undefined,
     );
-    if (result.ok) get().loadSnapshot(result.snapshot, new Date());
-    else set({ loading: false, loadError: result.error });
+    if (result.ok) {
+      writeCache(ownerRepo, result.snapshot, Date.now());
+      get().loadSnapshot(result.snapshot, new Date());
+    } else {
+      set({ loading: false, loadError: result.rateLimited ? rateLimitMessage(result.resetAt ?? null, get().hasToken) : result.error });
+    }
   },
 
   loadFromJson: (text) => {
