@@ -11,21 +11,23 @@ Entry for the **Kiroween 2026 Costume Contest**. The costume is a haunted visual
 <!-- TODO(human): add a screenshot or GIF here once the scene has run on a real GPU. -->
 (Screenshot placeholder.)
 
+## Live demo
+
+https://gtogbes.github.io/lenore/ (live once GitHub Pages is enabled with source "GitHub Actions" in the repo settings).
+
 ## Honest status
 
-The sandbox this project was written in had **no npm registry access** (HTTP 403). So:
+The authoring sandbox had no npm registry access, so the build was first verified on GitHub Actions (ubuntu, Node 22):
 
-| Command | Verified in the sandbox? |
+| Command | Status |
 | --- | --- |
-| `npm test` equivalent: `node --experimental-strip-types --test tests/*.test.ts` (26 core tests) | Yes, passing |
-| `tsc -p tsconfig.core.json --noEmit` (core and tests only) | Yes, passing |
-| `node scripts/check-imports.mjs` (import resolution and core purity) | Yes, passing |
-| `npm install` | No |
-| `npm run build` (`tsc --noEmit && vite build`) | **No, never run** |
-| `npm run dev` and the 3D scene | **No, never run** |
-| `npm run test:pbt` (needs fast-check) | No, never run with fast-check installed |
-
-The React and Three.js code under `src/scene`, `src/ui` and `src/state` was written carefully but has not been compiled or rendered. Expect to fix a few type or runtime errors on the first `npm install && npm run build` on a machine with network access.
+| `npm install` | Passing in CI |
+| `npm test` (34 tests) | Passing in CI |
+| `npm run build` (`tsc --noEmit && vite build`) | Passing in CI |
+| `node scripts/check-imports.mjs` | Passing |
+| `npm run test:pbt` (needs fast-check, now in devDependencies) | Runs where fast-check is installed; not yet confirmed in CI |
+| Pages deploy | Needs Pages enabled in repo settings |
+| Visual check of the 3D scene on a real GPU | TODO(human) |
 
 ## Features
 
@@ -77,7 +79,7 @@ The Necromancer is an offline deterministic mock. A pluggable real provider thro
 
 ## Deploy
 
-`.github/workflows/deploy-pages.yml` builds the app and publishes `dist` to GitHub Pages. It sets `BASE_PATH=/<repo>/` so assets resolve under the project page URL. Enable Pages with source "GitHub Actions" in the repository settings. The workflow has not been run yet.
+`.github/workflows/deploy-pages.yml` builds the app and publishes `dist` to GitHub Pages. It sets `BASE_PATH=/<repo>/` so assets resolve under the project page URL. Enable Pages with source "GitHub Actions" in the repository settings. The build steps have passed in CI; the deploy step needs Pages enabled first.
 
 ## Project structure
 
