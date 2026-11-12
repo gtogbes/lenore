@@ -10,7 +10,11 @@ export function RepoPanel() {
   const loadFromGithub = useStore((s) => s.loadFromGithub);
   const loadFromJson = useStore((s) => s.loadFromJson);
   const togglePanel = useStore((s) => s.togglePanel);
+  const hasToken = useStore((s) => s.hasToken);
+  const setToken = useStore((s) => s.setToken);
+  const forgetToken = useStore((s) => s.forgetToken);
   const [repo, setRepo] = useState("");
+  const [tokenText, setTokenText] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
@@ -18,6 +22,12 @@ export function RepoPanel() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     void loadFromGithub(repo);
+  };
+
+  const saveToken = (e: FormEvent) => {
+    e.preventDefault();
+    setToken(tokenText);
+    setTokenText("");
   };
 
   const upload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -51,12 +61,44 @@ export function RepoPanel() {
           {loading ? "Digging..." : "Dig up"}
         </button>
       </form>
+      <button
+        type="button"
+        className="wide"
+        disabled={loading || repo.trim() === ""}
+        onClick={() => void loadFromGithub(repo, true)}
+      >
+        Dig up again (skip saved copy)
+      </button>
+      {hasToken ? (
+        <div className="row">
+          <span className="hint">Token set for this tab.</span>
+          <button type="button" onClick={forgetToken}>Forget token</button>
+        </div>
+      ) : (
+        <form onSubmit={saveToken} className="row">
+          <input
+            type="password"
+            value={tokenText}
+            onChange={(e) => setTokenText(e.target.value)}
+            placeholder="GitHub token (optional)"
+            aria-label="GitHub token (optional)"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button type="submit" disabled={tokenText.trim() === ""}>Use token</button>
+        </form>
+      )}
       <button type="button" className="wide" onClick={() => fileInput.current?.click()}>
         Upload snapshot JSON
       </button>
       <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={upload} />
       <p className="hint">
-        Public repos only, unauthenticated, about 40 files. For a full local scan run
+        Public repos only, about 40 files, unauthenticated unless you add a token. A token is optional: it raises
+        the limit from 60 to 5,000 requests per hour, stays in this tab only and is sent only to api.github.com.{" "}
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer noopener">
+          Create a read-only fine-grained token
+        </a>
+        . Loaded repos are saved in this browser for an hour. For a full local scan run
         <code> node scripts/scan-repo.mjs &lt;dir&gt; out.json</code> and upload the result.
       </p>
       {error && <p className="error" role="alert">{error}</p>}

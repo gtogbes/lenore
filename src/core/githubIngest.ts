@@ -98,17 +98,20 @@ export class RateLimitError extends Error {
 
 export type IngestResult =
   | { ok: true; snapshot: RepoSnapshot }
-  | { ok: false; error: string; rateLimited: boolean };
+  | { ok: false; error: string; rateLimited: boolean; resetAt?: Date | null };
 
-type Fetcher = (url: string) => Promise<{
+export type FetchInit = { headers?: Record<string, string> };
+
+type Fetcher = (url: string, init?: FetchInit) => Promise<{
   ok: boolean;
   status: number;
   headers: { get(name: string): string | null };
   json(): Promise<unknown>;
 }>;
 
-async function getJson<T>(fetcher: Fetcher, url: string): Promise<T> {
-  const res = await fetcher(url);
+/** Calls GitHub. The token, if any, goes only here and never to the npm registry. */
+async function getJson<T>(fetcher: Fetcher, url: string, token?: string): Promise<T> {
+  const res = token ? await fetcher(url, { headers: { Authorization: `Bearer ${token}` } }) : await fetcher(url);
   // A 403 is a rate limit only when the quota is spent (or the header is absent); otherwise it is a block.
   const remaining = res.headers.get("x-ratelimit-remaining");
   if (res.status === 429 || (res.status === 403 && (remaining === null || remaining === "0"))) {
@@ -118,6 +121,7 @@ async function getJson<T>(fetcher: Fetcher, url: string): Promise<T> {
       reset ? new Date(Number(reset) * 1000) : null,
     );
   }
+  if (res.status === 401) throw new Error("GitHub rejected the token. Check it, or forget it to use unauthenticated requests.");
   if (res.status === 403) throw new Error("GitHub refused the request (403). The repo may be private or blocked.");
   if (res.status === 404) throw new Error("Repo not found. Check the name, and note that only public repos work.");
   if (!res.ok) throw new Error(`GitHub request failed with status ${res.status}`);
@@ -155,9 +159,9 @@ export function decodeBase64Utf8(b64: string): string {
 type PackageJson = NonNullable<GhParseInput["packageJson"]>;
 
 /** Best effort: the repo's root package.json, or undefined when absent or unreadable. */
-async function fetchPackageJson(fetcher: Fetcher, base: string): Promise<PackageJson | undefined> {
+async function fetchPackageJson(fetcher: Fetcher, base: string, token?: string): Promise<PackageJson | undefined> {
   try {
-    const doc = await getJson<{ content?: string; encoding?: string }>(fetcher, `${base}/contents/package.json`);
+    const doc = await getJson<{ content?: string; encoding?: string }>(fetcher, `${base}/contents/package.json`, token);
     if (doc.encoding !== "base64" || typeof doc.content !== "string") return undefined;
     const parsed: unknown = JSON.parse(decodeBase64Utf8(doc.content));
     return typeof parsed === "object" && parsed !== null ? (parsed as PackageJson) : undefined;
@@ -186,17 +190,19 @@ async function fetchRegistry(fetcher: Fetcher, names: string[], limit: number): 
 /**
  * Fetch a public repo (owner/name). Never throws; returns a typed result.
  * GitHub cost: 1 tree request, 1 package.json request and one commits request per file, so at most
- * 2 + maxFiles (42 by default) of the 60 unauthenticated requests per hour. Registry lookups go to npm, not GitHub.
+ * 2 + maxFiles (42 by default) of the 60 unauthenticated requests per hour (5,000 with a token). Registry lookups go to npm, not GitHub.
  */
 export async function fetchGithubSnapshot(
   ownerRepo: string,
   fetcher: Fetcher,
   now: Date,
   maxFiles = 40,
+  token?: string,
 ): Promise<IngestResult> {
+  const auth = token && token.trim() !== "" ? token.trim() : undefined;
   try {
     const base = `https://api.github.com/repos/${ownerRepo}`;
-    const tree = await getJson<GhTree>(fetcher, `${base}/git/trees/HEAD?recursive=1`);
+    const tree = await getJson<GhTree>(fetcher, `${base}/git/trees/HEAD?recursive=1`, auth);
     const candidates = tree.tree
       .filter((e) => e.type === "blob" && CODE_RE.test(e.path) && !IGNORE_RE.test(e.path))
       .sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
@@ -206,9 +212,10 @@ export async function fetchGithubSnapshot(
       commitsByPath[e.path] = await getJson<GhCommit[]>(
         fetcher,
         `${base}/commits?per_page=30&path=${encodeURIComponent(e.path)}`,
+        auth,
       );
     }
-    const packageJson = await fetchPackageJson(fetcher, base);
+    const packageJson = await fetchPackageJson(fetcher, base, auth);
     const depNames = Object.keys({ ...packageJson?.devDependencies, ...packageJson?.dependencies }).sort();
     const registry = await fetchRegistry(fetcher, depNames, MAX_REGISTRY_LOOKUPS);
     return {
@@ -216,7 +223,7 @@ export async function fetchGithubSnapshot(
       snapshot: parseGithubRepo({ repo: ownerRepo, tree: { tree: candidates }, commitsByPath, packageJson, registry, now }),
     };
   } catch (err) {
-    if (err instanceof RateLimitError) return { ok: false, error: err.message, rateLimited: true };
+    if (err instanceof RateLimitError) return { ok: false, error: err.message, rateLimited: true, resetAt: err.resetAt };
     return { ok: false, error: err instanceof Error ? err.message : String(err), rateLimited: false };
   }
 }

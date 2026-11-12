@@ -13,3 +13,4 @@
 - [x] Property tests with graceful fast-check skip
 - [x] Render placements in R3F (`src/scene`), instanced where possible
 - [x] Repo loader UI: sample, uploaded JSON, GitHub owner/name
+- [x] Optional GitHub token, one hour result cache and rate limit reset time (`src/state/githubStorage.ts`)
