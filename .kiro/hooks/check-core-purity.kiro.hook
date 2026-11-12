@@ -1,0 +1,13 @@
+{
+  "name": "Check core purity and imports",
+  "description": "Verifies imports resolve and src/core never imports react or three after any TypeScript edit.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "node scripts/check-imports.mjs"
+  }
+}

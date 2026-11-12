@@ -1,0 +1,13 @@
+{
+  "name": "Run core tests on save",
+  "description": "Runs the dependency-free node:test suite and the core typecheck whenever a file in src/core changes.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["src/core/**/*.ts"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "node --experimental-strip-types --test tests/*.test.ts && tsc -p tsconfig.core.json --noEmit"
+  }
+}

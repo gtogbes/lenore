@@ -1,0 +1,11 @@
+{
+  "_EXAMPLE": "Example only. Disabled. Copy to .kiro/settings/mcp.json to use. The package name below is a placeholder; verify a real git history MCP server before enabling.",
+  "mcpServers": {
+    "git-history-example": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "disabled": true,
+      "autoApprove": []
+    }
+  }
+}

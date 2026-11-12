@@ -1,0 +1,13 @@
+{
+  "name": "Keep spec tasks in sync",
+  "description": "When source files change, remind the agent to tick or add checkboxes in the matching .kiro/specs/*/tasks.md.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["src/**/*.ts", "src/**/*.tsx"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file under src/ changed. Decide which spec it belongs to: graveyard-generation (analysis, layout, epitaph, sample, ingest, scene placement), resurrection-ritual (necromancer, ritual UI and store) or demo-mode (demoScript, camera rig, captions). Open that spec's tasks.md in .kiro/specs/ and tick any checkbox that this change completes, or add a new unchecked task if the change introduced unplanned work. If an EARS acceptance criterion in requirements.md is no longer true, update it. Do not use em dashes. Reply with one line saying what you updated, or 'no spec change needed'."
+  }
+}

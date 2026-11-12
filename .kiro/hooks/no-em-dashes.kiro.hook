@@ -1,0 +1,13 @@
+{
+  "name": "No em dashes in Markdown",
+  "description": "Checks saved Markdown files for em dashes, which the style guide forbids, and rewrites them.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["**/*.md"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A Markdown file was saved. Search it for the em dash character (U+2014). If any are present, replace each with a colon, comma, period or parentheses, whichever reads best, keeping the meaning and the haunting tone from .kiro/steering/style-haunting.md. If none are present, do nothing and say nothing."
+  }
+}
