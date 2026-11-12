@@ -4,7 +4,7 @@ Items marked **TODO(human)** need real, first-hand experience from the person wh
 
 ## Honest context
 
-The code and docs here were produced by Kiro agents in a sandbox with no npm registry access. Only the core tests, the core typecheck and the import check were run. The Vite build and the 3D scene have not been run. See the status table in [README.md](README.md).
+The code and docs were produced by Kiro agents in a sandbox with no npm registry access, so the Vite build and the 3D scene could not be run there. The first real build ran on GitHub Actions (ubuntu, Node 22): `npm install`, `npm test` (34 of 34 passing) and `npm run build` (`tsc --noEmit` plus `vite build`) all succeeded. The only failing step was the Pages deploy, because Pages was not yet enabled in the repo settings. The scene has still not been checked by eye on a real GPU: TODO(human).
 
 ## IDE vs CLI vs Web vs Crew
 
@@ -13,13 +13,13 @@ The code and docs here were produced by Kiro agents in a sandbox with no npm reg
 | IDE | TODO(human): describe what you did in the Kiro IDE (specs, hooks panel, steering). |
 | CLI | TODO(human): describe any `kiro-cli` sessions. |
 | Web | The sandboxed, browser-based agent session that wrote the first implementation (core, scene, UI, docs, tests). It could run git, node and tsc but not npm installs. |
-| Crew | TODO(human): say whether a multi-agent crew was used. In this repo an orchestrator split the work into three features (core and .kiro files, scene and UI, docs), each done by a sub-agent. |
+| Crew | An orchestrator delegated to a planner sub-agent, a coder sub-agent and a semantic reviewer. The planner wrote the task plan and three features (core and .kiro files, scene and UI, docs), the coder implemented them, and the reviewer ran three review rounds before final approval. TODO(human): say how well this worked for you. |
 
 TODO(human): add your honest comparison of the four surfaces: what each was good and bad at.
 
 ## Custom agents
 
-No custom agent definition files are committed in this repo. The orchestrator and sub-agent split described above came from the hosting environment, and the task plan lives in `.agents/tasks/task-lenore/`. TODO(human): if you define a custom agent (for example a "Necromancer reviewer"), commit it and describe it here.
+No custom agent definition files are committed in this repo. The orchestrator and sub-agent split described above came from the hosting environment, and the task plan lives in `.agents/tasks/task-necropolis/`. TODO(human): if you define a custom agent (for example a "Necromancer reviewer"), commit it and describe it here.
 
 ## Agent hooks
 
@@ -63,8 +63,8 @@ No MCP server is active. An **example, disabled** config for a git-history serve
 
 ## Property-based testing
 
-`tests/pbt/properties.test.ts` uses fast-check through a dynamic `import("fast-check")` in a try/catch, and skips when the package is absent. Three properties are covered: layout never overlaps markers, classify is total and deterministic, and epitaphs never exceed the length bound. In the sandbox fast-check could not be installed, so these tests were **not run**. TODO(human): run `npm run test:pbt` after `npm install` and record any counterexamples found.
+`tests/pbt/properties.test.ts` uses fast-check through a dynamic `import("fast-check")` in a try/catch, and skips when the package is absent. Three properties are covered: layout never overlaps markers, classify is total and deterministic, and epitaphs never exceed the length bound. fast-check could not be installed in the authoring sandbox, so it was added to `devDependencies` afterwards so that CI can run these properties. TODO(human): run `npm run test:pbt` after `npm install` and record any counterexamples found.
 
 ## Kiro powers
 
-Powers available in the authoring environment included `github-cli` (git and PR work), `playwright` and `agent-browser` (browser automation, which could screenshot the scene once it runs), and `gitlab-cli`. None are required by the project. TODO(human): state which powers you actually used.
+Powers available in the authoring environment included `github-cli` (git and PR work), `playwright` and `agent-browser` (browser automation, which could screenshot the scene once it runs), and `gitlab-cli`. None are required by the project. The `github-cli` power was used for the repository, the push, pull requests and reading CI logs. TODO(human): say whether you used any other power.
